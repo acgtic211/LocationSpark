@@ -1,15 +1,15 @@
 package cs.purdue.edu.spatialrdd.impl
 
-import cs.purdue.edu.spatialindex.quatree.SBQTree
-import cs.purdue.edu.spatialindex.rtree.{Entry}
+import cs.purdue.edu.spatialindex.rtree.{Entry, _}
 import cs.purdue.edu.spatialrdd.SpatialRDDPartition
 import org.apache.spark.Logging
-import cs.purdue.edu.spatialindex.rtree._
 
-import scala.collection.immutable.{HashMap}
+import scala.collection.immutable.HashMap
 import scala.collection.mutable
-import scala.collection.mutable.ArrayBuffer
+import scala.collection.mutable.{ArrayBuffer, PriorityQueue}
 import scala.reflect.ClassTag
+import scala.util.control.Breaks._
+
 
 /**
  * Created by merlin on 11/22/15.
@@ -23,7 +23,6 @@ class SMapPartition[K, V]
   )
   extends SpatialRDDPartition[K,V] with Logging
 {
-
    //val Quadfilter=new SBQTree(1000)
   //qtree.trainSBfilter(datapoint)
 
@@ -198,10 +197,10 @@ class SMapPartition[K, V]
     {
       case e:Point =>
       {
-        val ret=this.data.map
+        val ret=this.data.filter(p=>z(Entry(p._1.asInstanceOf[Geom],p._2))).map
         {
           case(k,v)=>
-              (k,v, entry.asInstanceOf[Entry[V]].geom.distanceSquared(k.asInstanceOf[Point]))
+              (k,v, e.distanceSquared(k.asInstanceOf[Point]))
         }
 
         ret.toList.sortWith( _._3<_._3).take(k).toIterator
@@ -272,6 +271,207 @@ class SMapPartition[K, V]
     buff.toIterator
   }
 
+  override def kcpquery_[U: ClassTag]
+  (other: SpatialRDDPartition[K, U], knn:Int, beta:Option[Double], pqIn:Option[Iterator[(K,K,Double)]], f1:(K)=>Boolean,
+   f2:(V)=>Boolean )
+  : Iterator[(K, K, Double)]={
+    kcpquery_(other.iterator, knn, beta, pqIn, f1,f2)
+  }
+
+
+  //    val sortedData = this.data.toIndexedSeq.sortBy(_._1)
+
+  def kcpquery_[U: ClassTag]
+  (other: Iterator[(K, U)], knn:Int, beta:Option[Double], pqIn:Option[Iterator[(K,K,Double)]], f1:(K)=>Boolean,
+   f2:(V)=>Boolean ):  Iterator[(K, K, Double)]=
+  {
+
+    val sortedData = this.data.toArray
+
+    implicit val ord2 = Ordering.by[(K,V),Float](_._1.asInstanceOf[Geom].toBox.x)
+
+    scala.util.Sorting.quickSort(sortedData)
+
+    val otherData = other.toArray
+
+    implicit val ord3 = Ordering.by[(K,U),Float](_._1.asInstanceOf[Geom].toBox.x)
+    scala.util.Sorting.quickSort(otherData)
+
+    /*val sortedData = this.data.toSeq.sortBy(_._1.asInstanceOf[Geom].toBox.x)
+    val otherData = other.toSeq.sortBy(_._1.asInstanceOf[Geom].toBox.x)*/
+
+    var i = 0
+    var j = 0
+    val gTotPoints1 = sortedData.length
+    val gTotPoints2 = otherData.length
+
+    implicit val ord = Ordering.by[(K,K,Double),Double](_._3)
+
+    val pq = PriorityQueue.empty[(K,K,Double)]
+
+    if (pqIn.isDefined){
+      pq ++= pqIn.get
+    }
+
+
+    var gdmax = beta match {
+      case Some(value) =>
+        value
+      case None =>
+        Double.PositiveInfinity
+    }
+
+    //println(gTotPoints1+":"+gTotPoints2+":"+gdmax)
+
+
+    while(i<gTotPoints1&&j<gTotPoints2){
+      val p = sortedData(i)._1.asInstanceOf[Point]
+      val q = otherData(j)._1.asInstanceOf[Point]
+
+      if(p.x<q.x){
+        val refo = p
+
+        breakable {
+          for (k <- j until gTotPoints2) {
+            val curo = otherData(k)._1.asInstanceOf[Point]
+            val dx = curo.x - refo.x
+            if (dx >= gdmax) {
+              if(dx > gdmax || pq.size == knn)
+                break
+            }
+            val d = refo.distance(curo)
+            if (d < gdmax || (d == gdmax && pq.size < knn)) {
+              pq += ((refo.asInstanceOf[K], curo.asInstanceOf[K], d))
+              if (pq.size > knn) {
+                pq.dequeue
+                gdmax = pq.head._3
+                //println(gdmax)
+              }
+            }
+          }
+        }
+
+        i=i+1
+      }else{
+        val refo = q
+
+        breakable {
+          for (k <- i until gTotPoints1) {
+            val curo = sortedData(k)._1.asInstanceOf[Point]
+            val dx = curo.x - refo.x
+            if (dx >= gdmax) {
+              if(dx > gdmax || pq.size == knn)
+                break
+            }
+            val d = refo.distance(curo)
+            if (d < gdmax || (d == gdmax && pq.size < knn)) {
+              pq += ((curo.asInstanceOf[K], refo.asInstanceOf[K], d))
+              if (pq.size > knn) {
+                pq.dequeue
+                gdmax = pq.head._3
+                //println(gdmax)
+
+              }
+            }
+          }
+        }
+
+        j=j+1
+      }
+    }
+    pq.toArray.toIterator
+
+  }
+
+  override def edjquery_[U: ClassTag]
+  (other: SpatialRDDPartition[K, U], epsilon:Double, f1:(K)=>Boolean,
+   f2:(V)=>Boolean )
+  : Iterator[(K, K, Double)]={
+    edjquery_(other.iterator, epsilon, f1,f2)
+  }
+
+
+  //    val sortedData = this.data.toIndexedSeq.sortBy(_._1)
+
+  def edjquery_[U: ClassTag]
+  (other: Iterator[(K, U)], epsilon:Double, f1:(K)=>Boolean,
+   f2:(V)=>Boolean ):  Iterator[(K, K, Double)]=
+  {
+
+    val sortedData = this.data.toArray
+
+    implicit val ord2 = Ordering.by[(K,V),Float](_._1.asInstanceOf[Geom].toBox.x)
+
+    scala.util.Sorting.quickSort(sortedData)
+
+    val otherData = other.toArray
+
+    implicit val ord3 = Ordering.by[(K,U),Float](_._1.asInstanceOf[Geom].toBox.x)
+    scala.util.Sorting.quickSort(otherData)
+
+    /*val sortedData = this.data.toSeq.sortBy(_._1.asInstanceOf[Geom].toBox.x)
+    val otherData = other.toSeq.sortBy(_._1.asInstanceOf[Geom].toBox.x)*/
+
+    var i = 0
+    var j = 0
+    val gTotPoints1 = sortedData.length
+    val gTotPoints2 = otherData.length
+
+    implicit val ord = Ordering.by[(K,K,Double),Double](_._3)
+
+    val pq = ArrayBuffer.empty[(K,K,Double)]
+
+
+    val gdmax = epsilon
+
+    //println(gTotPoints1+":"+gTotPoints2+":"+gdmax)
+
+
+    while(i<gTotPoints1&&j<gTotPoints2){
+      val p = sortedData(i)._1.asInstanceOf[Point]
+      val q = otherData(j)._1.asInstanceOf[Point]
+
+      if(p.x<q.x){
+        val refo = p
+
+        breakable {
+          for (k <- j until gTotPoints2) {
+            val curo = otherData(k)._1.asInstanceOf[Point]
+            val dx = curo.x - refo.x
+            if (dx > gdmax) {
+              break
+            }
+            val d = refo.distance(curo)
+            if (d <= gdmax) {
+              pq += ((refo.asInstanceOf[K], curo.asInstanceOf[K], d))
+            }
+          }
+        }
+
+        i=i+1
+      }else{
+        val refo = q
+
+        breakable {
+          for (k <- i until gTotPoints1) {
+            val curo = sortedData(k)._1.asInstanceOf[Point]
+            val dx = curo.x - refo.x
+            if (dx >gdmax) {
+                break
+            }
+            val d = refo.distance(curo)
+            if (d <= gdmax) {
+              pq += ((curo.asInstanceOf[K], refo.asInstanceOf[K], d))
+            }
+          }
+        }
+
+        j=j+1
+      }
+    }
+    pq.toIterator
+
+  }
   /**
    * @todo add this function in future
    * @param other
@@ -288,6 +488,10 @@ class SMapPartition[K, V]
     }
   }
 
+  protected var _box: Box = Box.empty
+
+  override def box: Box = this._box
+
 }
 
 private[spatialrdd] object SMapPartition
@@ -303,14 +507,19 @@ private[spatialrdd] object SMapPartition
   {
 
     var map =new HashMap[K,V]
+    var tempBox = (Float.MaxValue,Float.MaxValue,Float.MinValue,Float.MinValue)
 
     iter.foreach {
-      case(k, v) => map = map + (k -> v)
+      case(k, v) => {
+        map = map + (k -> v)
+        val kBox = k.asInstanceOf[Geom].toBox
+        tempBox = (Math.min(tempBox._1,kBox.x),Math.min(tempBox._2,kBox.y),Math.max(tempBox._3,kBox.x2),Math.max(tempBox._4,kBox.y2))
+      }
     }
-
+    val auxBox = new Box(tempBox._1,tempBox._2,tempBox._3,tempBox._4)
     val smp=new SMapPartition(map)
+    smp._box = auxBox
     //smp.Quadfilter.trainSBfilter(iter.map{case(k,v)=>k.asInstanceOf[Geom]})
-
     smp
   }
 

@@ -16,7 +16,7 @@ import scala.collection.mutable.ArrayBuffer
  * the spilit leaf box order is NW,NE,SE,SW
  */
 
-case class SBQTree() extends serializable{
+case class SBQTree() extends Serializable{
 
   var budget = 0
   var root: Node = null

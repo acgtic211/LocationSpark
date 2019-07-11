@@ -384,7 +384,7 @@ case class QTree[V] (LEAF_MAX_CAPACITY: Int,space:Box){
 
       implicit val ord = Ordering.by[(Double, Entry[V]), Double](_._1)
       val pq = PriorityQueue.empty[(Double, Entry[V])]
-      nearestK(this.root,pt, k, Double.PositiveInfinity, pq)
+      nearestK(this.root,pt, k, Double.PositiveInfinity, z, pq)
       val arr = new Array[Entry[V]](pq.size)
       var i = arr.length - 1
       while (i >= 0) {
@@ -405,7 +405,7 @@ case class QTree[V] (LEAF_MAX_CAPACITY: Int,space:Box){
     } else {
       implicit val ord = Ordering.by[(Double, Entry[V]), Double](_._1)
       val pq = PriorityQueue.empty[(Double, Entry[V])]
-      nearestK(this.root,pt, k, Double.PositiveInfinity, pq)
+      nearestK(this.root,pt, k, Double.PositiveInfinity, z, pq)
 
       val arr = new Array[(Double, Entry[V])](pq.size)
       var i = arr.length - 1
@@ -418,7 +418,7 @@ case class QTree[V] (LEAF_MAX_CAPACITY: Int,space:Box){
     }
   }
 
-  private def nearestK(node:Node, pt: Point, k: Int, d0: Double, pq: PriorityQueue[(Double, Entry[V])]):
+  private def nearestK(node:Node, pt: Point, k: Int, d0: Double, z:Entry[V]=>Boolean, pq: PriorityQueue[(Double, Entry[V])]):
   Double = {
     var dist: Double = d0
 
@@ -426,12 +426,14 @@ case class QTree[V] (LEAF_MAX_CAPACITY: Int,space:Box){
       case l:leafwithstorage[V] =>
         l.storage.foreach { e =>
           val d = e._1.distance(pt)
-          if (d < dist) {
-            pq += ((d, Entry(e._1,e._2)))
-            if (pq.size > k)
-            {
-              pq.dequeue
-              dist = pq.head._1
+          if(z(Entry(e._1,e._2))){
+            if (d < dist) {
+              pq += ((d, Entry(e._1,e._2)))
+              if (pq.size > k)
+              {
+                pq.dequeue
+                dist = pq.head._1
+              }
             }
           }
         }
@@ -440,7 +442,7 @@ case class QTree[V] (LEAF_MAX_CAPACITY: Int,space:Box){
         cs.foreach {
           case (d, node) =>
           if (d >= dist) return dist //scalastyle:ignore
-          dist = nearestK(node, pt, k, dist, pq)
+          dist = nearestK(node, pt, k, dist, z, pq)
         }
     }
     dist

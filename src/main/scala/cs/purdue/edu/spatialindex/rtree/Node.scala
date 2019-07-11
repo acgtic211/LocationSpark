@@ -1,7 +1,6 @@
 package cs.purdue.edu.spatialindex.rtree
 
 import scala.collection.mutable.{ArrayBuffer, PriorityQueue}
-import scala.math.{min, max}
 
 /**
  * Some useful constants that we don't want to hardcode.
@@ -13,7 +12,7 @@ object Constants {
   // $COVERAGE-ON$
 }
 
-import Constants._
+import cs.purdue.edu.spatialindex.rtree.Constants._
 
 /**
  * Abstract data type that has a geom element.
@@ -385,7 +384,7 @@ sealed abstract class Node[V] extends HasGeom { self =>
         val cs = children.map(node => (node.box.distance(pt), node)).sortBy(_._1)
         cs.foreach { case (d, node) =>
           if (d >= dist) return dist //scalastyle:ignore
-          dist = node.nearestK(pt, k, dist, pq)
+          dist = node.nearestK(pt, k, dist, z, pq)
         }
     }
     dist

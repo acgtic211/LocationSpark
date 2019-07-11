@@ -578,7 +578,7 @@ class QtreeForPartion() extends Serializable{
           getPID(child,p)
         }else
         {
-          throw new IllegalStateException("data point is not correct location format")
+          throw new IllegalStateException("data point is not correct location format "+p)
           0
         }
 

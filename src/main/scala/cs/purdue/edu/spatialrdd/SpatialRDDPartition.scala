@@ -12,8 +12,9 @@
  */
 package cs.purdue.edu.spatialrdd
 
-import scala.reflect.ClassTag
 import cs.purdue.edu.spatialindex.rtree.{Box, Entry}
+
+import scala.reflect.ClassTag
 
 abstract class SpatialRDDPartition [K, V] extends Serializable {
 
@@ -123,6 +124,46 @@ abstract class SpatialRDDPartition [K, V] extends Serializable {
    f1:(K)=>Boolean,
    f2:(V)=>Boolean ): Iterator[(K, Double, Iterator[(K,V)])]
 
+  /** kcpq join operation
+    * the other rdd is query rdd.
+    * the key is the location of the query point, and value is k
+    */
+  def kcpquery_[U: ClassTag]
+  (other: SpatialRDDPartition[K, U],  knn:Int, beta: Option[Double], pqIn:Option[Iterator[(K,K,Double)]], f1:(K)=>Boolean,
+   f2:(V)=>Boolean )
+  : Iterator[(K, K, Double)]
+
+  /** kcpq join operation
+    * the other rdd is query rdd.
+    * the key is the location of the query point, and value is k
+    */
+  def kcpquery_[U: ClassTag]
+  (other: Iterator[(K, U)],
+   knn:Int,
+   beta: Option[Double],
+   pqIn:Option[Iterator[(K,K,Double)]],
+   f1:(K)=>Boolean,
+   f2:(V)=>Boolean ): Iterator[(K, K, Double)]
+
+  /** edjq join operation
+    * the other rdd is query rdd.
+    * the key is the location of the query point, and value is k
+    */
+  def edjquery_[U: ClassTag]
+  (other: SpatialRDDPartition[K, U], epsilon: Double, f1:(K)=>Boolean,
+   f2:(V)=>Boolean )
+  : Iterator[(K, K, Double)]
+
+  /** kcpq join operation
+    * the other rdd is query rdd.
+    * the key is the location of the query point, and value is k
+    */
+  def edjquery_[U: ClassTag]
+  (other: Iterator[(K, U)],
+   epsilon: Double,
+   f1:(K)=>Boolean,
+   f2:(V)=>Boolean ): Iterator[(K, K, Double)]
+
 
   /**
    * this range join is used for knn join
@@ -143,6 +184,7 @@ abstract class SpatialRDDPartition [K, V] extends Serializable {
    */
   //def filter(pred: (K, V) => Boolean): SpatialRDDPartition[K, V]
 
+  def box: Box
 
 
 }

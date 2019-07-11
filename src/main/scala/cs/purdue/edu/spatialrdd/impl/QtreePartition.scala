@@ -234,6 +234,51 @@ class QtreePartition [K, V]
     ret.toIterator
   }
 
+  override def kcpquery_[U: ClassTag]
+  (other: SpatialRDDPartition[K, U],  knn:Int, beta: Option[Double], pqIn:Option[Iterator[(K,K,Double)]], f1:(K)=>Boolean,
+   f2:(V)=>Boolean )
+  : Iterator[(K, K, Double)]=kcpquery_(other.iterator, knn, beta, pqIn, f1,f2)
+
+  /** knn join operation
+    * the other rdd is query rdd.
+    * the key is the location of the query point, and value is k
+    */
+  override def kcpquery_[U: ClassTag]
+  (other: Iterator[(K, U)],
+   knn:Int,
+   beta: Option[Double],
+   pqIn:Option[Iterator[(K,K,Double)]],
+   f1:(K)=>Boolean,
+   f2:(V)=>Boolean ): Iterator[(K, K, Double)]={
+    println("kcpquery_(Q)")
+
+    Iterator.empty
+
+  }
+
+  /** edjq join operation
+    * the other rdd is query rdd.
+    * the key is the location of the query point, and value is k
+    */
+  def edjquery_[U: ClassTag]
+  (other: SpatialRDDPartition[K, U], epsilon: Double, f1:(K)=>Boolean,
+   f2:(V)=>Boolean )
+  : Iterator[(K, K, Double)]=edjquery_(other.iterator, epsilon, f1,f2)
+
+  /** kcpq join operation
+    * the other rdd is query rdd.
+    * the key is the location of the query point, and value is k
+    */
+  def edjquery_[U: ClassTag]
+  (other: Iterator[(K, U)],
+   epsilon: Double,
+   f1:(K)=>Boolean,
+   f2:(V)=>Boolean ): Iterator[(K, K, Double)]={
+    println("edjquery_(Q)")
+
+    Iterator.empty
+  }
+
   /**
    * @param other
    * @tparam U
@@ -271,6 +316,8 @@ class QtreePartition [K, V]
     }
 
   }
+
+  override def box: Box = this.tree.root.getbox
 
 }
 private[spatialrdd] object QtreePartition {

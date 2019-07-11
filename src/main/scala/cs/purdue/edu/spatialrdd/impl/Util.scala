@@ -1,8 +1,6 @@
 package cs.purdue.edu.spatialrdd.impl
 
-import cs.purdue.edu.spatialindex.rtree.{Point, Entry}
-
-import scala.util.Random._
+import cs.purdue.edu.spatialindex.rtree.{Entry, Point}
 
 /**
  * Created by merlin on 9/20/15.
@@ -18,7 +16,7 @@ object Util{
   }
 
   //number of partitions for spatialRDD
-  def numPartition=500
+  var numPartition=500
 
   //the percentage of sampling for the input data, this is used for build index
   def sampleRatio=0.01f
